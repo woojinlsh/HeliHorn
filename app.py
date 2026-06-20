@@ -6,31 +6,37 @@ import time
 st.set_page_config(page_title="Verkada Horn Helix Controller", layout="wide")
 
 # --------------------------------------------------------
-# 🎨 버튼 크기를 훨씬 더 크게 만들기 위한 커스텀 CSS 주입
+# 📱 [수정] 아이패드/태블릿 터치 조작을 위한 초대형 버튼 CSS 스타일
 # --------------------------------------------------------
 st.markdown("""
     <style>
-        /* 모든 버튼의 높이, 글자 크기, 테두리 둥글기 조절 */
+        /* 모든 버튼의 높이, 글자 크기를 아이패드 터치에 최적화 */
         div.stButton > button:first-child {
-            height: 4.5rem !important;      /* 버튼 세로 높이 확대 */
-            font-size: 24px !important;     /* 글자 크기 대폭 확대 */
+            height: 6.5rem !important;      /* 터치 영역을 대폭 확대 (기존 4.5rem -> 6.5rem) */
+            font-size: 32px !important;     /* 멀리서도 잘 보이고 누르기 쉬운 폰트 크기 */
             font-weight: bold !important;   /* 글자 두껍게 */
-            border-radius: 12px !important; /* 부드러운 라운드 처리 */
-            transition: all 0.2s ease;
+            border-radius: 16px !important; /* 모서리를 더 둥글고 직관적이게 변경 */
+            margin-bottom: 15px !important; /* 버튼 간 오터치(오클릭) 방지를 위한 충분한 여백 */
+            box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.15) !important; /* 터치 대상이 명확히 보이도록 그림자 추가 */
+            transition: all 0.15s ease;
         }
-        /* 버튼에 마우스를 올렸을 때 효과 */
+        
+        /* 버튼을 누르거나 마우스를 올렸을 때 액션 효과 */
+        div.stButton > button:first-child:active {
+            transform: scale(0.98); /* 터치 시 눌리는 피드백 제공 */
+        }
         div.stButton > button:first-child:hover {
-            transform: scale(1.02);
             border-color: #ff4b4b !important;
+            background-color: rgba(255, 75, 75, 0.05) !important;
         }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("📯 Verkada Horn Helix Controller")
-st.caption("기본 설정값 변경 및 초대형 버튼 스타일이 적용된 제어 도구입니다.")
+st.caption("아이패드 터치 UI 최적화 및 Device Name 설정이 적용된 버전입니다.")
 
 # --------------------------------------------------------
-# 1. 사이드바 설정 (기본값 수정: Horn 1개 / 버튼 3개)
+# 1. 사이드바 설정 (API 및 카메라 정보 입력)
 # --------------------------------------------------------
 st.sidebar.header("⚙️ 기본 설정 (Configuration)")
 
@@ -63,28 +69,29 @@ event_type_uid = st.sidebar.text_input(
 
 st.sidebar.markdown("---")
 
-# [수정] 기본값을 Horn 1개, 버튼 3개로 변경
+# 기본값: Horn 1개, 버튼 3개 유지
 num_horns = st.sidebar.number_input("Horn 개수 (개별 Device)", min_value=1, max_value=20, value=1)
 num_buttons = st.sidebar.number_input("Horn당 메시지 버튼 개수", min_value=1, max_value=10, value=3)
 
 # --------------------------------------------------------
-# 2. 메인 화면: 각 Horn의 Device ID 입력 칸 생성
+# 2. 메인 화면: [수정] 각 Horn의 Device Name 입력 칸 생성
 # --------------------------------------------------------
-st.subheader("🆔 Horn별 Device ID 설정")
-st.write("설정한 Horn 개수만큼 Device ID를 입력해주세요.")
+st.subheader("🆔 Horn별 Device Name 설정")
+st.write("설정한 Horn 개수만큼 Device Name을 입력해주세요.")
 
-horn_ids = []
+horn_names = []
 id_cols = st.columns(min(num_horns, 4)) 
 
 for i in range(num_horns):
     col_idx = i % 4
     with id_cols[col_idx]:
-        h_id = st.text_input(
-            f"Horn {i+1} Device ID", 
-            value=f"HORN_DEV_{i+1}", 
+        # [수정] Device ID -> Device Name 명칭 변경
+        h_name = st.text_input(
+            f"Horn {i+1} Device Name", 
+            value=f"HORN_NAME_{i+1}", 
             key=f"horn_input_{i}"
         )
-        horn_ids.append(h_id)
+        horn_names.append(h_name)
 
 st.markdown("---")
 
@@ -106,7 +113,7 @@ def get_short_lived_token(api_key):
         raise Exception(f"단기 토큰 생성 실패 (상태 코드: {response.status_code}) - {response.text}")
 
 
-def send_video_tagging_event(token, org_id, cam_id, event_uid, dev_id, msg_type):
+def send_video_tagging_event(token, org_id, cam_id, event_uid, dev_name, msg_type):
     url = f"https://api.verkada.com/cameras/v1/video_tagging/event?org_id={org_id}"
     
     headers = {
@@ -117,10 +124,11 @@ def send_video_tagging_event(token, org_id, cam_id, event_uid, dev_id, msg_type)
     
     current_time_ms = int(time.time() * 1000)
     
+    # [참고] API 스펙에 맞추어 키값은 'Device_ID'로 유지하되, 입력받은 dev_name 값을 매핑합니다.
     payload = {
         "attributes": {
             "Camera_ID": cam_id,
-            "Device_ID": dev_id,
+            "Device_ID": dev_name, 
             "Message_Type": str(msg_type)
         },
         "event_type_uid": event_uid,
@@ -134,12 +142,13 @@ def send_video_tagging_event(token, org_id, cam_id, event_uid, dev_id, msg_type)
 # --------------------------------------------------------
 # 4. 메인 화면: 동적 제어 버튼 생성 및 이벤트 바인딩
 # --------------------------------------------------------
-st.subheader("🚀 Horn 제어 패널")
-st.info("버튼 크기가 확대되었습니다. 누르면 실시간으로 단기 토큰을 발급받아 이벤트를 전송합니다.")
+st.subheader("🚀 Horn 제어 패널 (태블릿 터치 스크린용)")
+st.info("아이패드 환경에서 검지나 엄지손가락으로 쉽게 누를 수 있도록 설계되었습니다.")
 
 for i in range(num_horns):
-    current_horn_id = horn_ids[i]
-    st.write(f"### 📢 Horn {i+1} (ID: `{current_horn_id}`)")
+    current_horn_name = horn_names[i]
+    # [수정] UI 타이틀 명칭 변경
+    st.write(f"### 📢 Horn {i+1} (Name: `{current_horn_name}`)")
     
     btn_cols = st.columns(num_buttons)
     for j in range(num_buttons):
@@ -148,7 +157,6 @@ for i in range(num_horns):
         with btn_cols[j]:
             btn_label = f"Msg {message_id}"
             
-            # use_container_width로 가로폭을 채우고, CSS로 세로와 폰트 크기를 키움
             if st.button(btn_label, key=f"btn_{i}_{message_id}", use_container_width=True):
                 if not api_key:
                     st.warning("⚠️ 사이드바에 API Key를 먼저 입력해주세요.")
@@ -168,7 +176,7 @@ for i in range(num_horns):
                                 org_id=org_id,
                                 cam_id=camera_id,
                                 event_uid=event_type_uid,
-                                dev_id=current_horn_id,
+                                dev_name=current_horn_name, # Device Name 전달
                                 msg_type=message_id
                             )
                             
