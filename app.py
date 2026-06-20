@@ -1,34 +1,44 @@
 import streamlit as st
 import requests
-import uuid  # 고유한 Event_ID 생성을 위해 추가
+import time  # 실시간 time_ms 계산을 위해 추가
 
 # 페이지 설정
 st.set_page_config(page_title="Verkada Horn Helix Controller", layout="wide")
 
 st.title("📯 Verkada Horn Helix Controller")
-st.caption("Verkada API v2 보안 규격 및 Event_ID 필수 옵션이 반영된 Horn 우회 제어 도구입니다.")
+st.caption("제공해주신 Video Tagging Event API 규격에 맞춘 Horn 우회 제어 도구입니다.")
 
 # --------------------------------------------------------
-# 1. 사이드바 설정 (API 및 카메라 정보 입력)
+# 1. 사이드바 설정 (API, 웹 입력 옵션값 정의)
 # --------------------------------------------------------
 st.sidebar.header("⚙️ 기본 설정 (Configuration)")
 
-api_base_url = st.sidebar.text_input(
-    "Verkada API Base URL", 
-    value="https://api.verkada.com",
-    help="Verkada API의 기본 주소입니다."
-)
-
-top_level_api_key = st.sidebar.text_input(
-    "Top-level API Key", 
+# 헤더에 들어갈 API Key 입력
+api_key = st.sidebar.text_input(
+    "Verkada API Key (x-verkada-auth)", 
     type="password", 
-    help="Verkada Command > Settings > API Keys 에서 생성한 최상위 API Key를 입력하세요."
+    help="curl의 x-verkada-auth 헤더에 들어갈 API Key를 입력하세요."
 )
 
+# URL 쿼리 파라미터에 들어갈 org_id 입력 (기본값 제공)
+org_id = st.sidebar.text_input(
+    "Organization ID (org_id)",
+    value="61b8824a-14bd-4642-9165-1e7d7b173167",
+    help="URL 쿼리 스트링(?org_id=...)에 들어갈 조직 ID입니다."
+)
+
+# attributes 내부 및 외부 구조에 공통으로 쓰일 Camera ID
 camera_id = st.sidebar.text_input(
     "Camera ID", 
     value="유효한_카메라_ID_입력", 
     help="Helix 메시지와 연동할 Camera ID를 입력하세요."
+)
+
+# 요구하신 "웹에서 받아야 하는 event uid 정보" 입력 칸
+event_type_uid = st.sidebar.text_input(
+    "Event Type UID (event_type_uid)",
+    value="9232f31e-a123-4da5-ba5b-7a77627fa62e",
+    help="웹 화면에서 동적으로 변경할 수 있는 event_type_uid 정보입니다."
 )
 
 st.sidebar.markdown("---")
@@ -59,49 +69,40 @@ for i in range(num_horns):
 st.markdown("---")
 
 # --------------------------------------------------------
-# 3. 핵심 로직: Verkada 인증 및 Helix 메시지 발송 함수
+# 3. 핵심 로직: Verkada Video Tagging API 전송 함수
 # --------------------------------------------------------
-
-# 1단계: Top-level API Key로 30분짜리 short-lived API Token 가져오기
-def get_short_lived_token(base_url, api_key):
-    token_url = f"{base_url.rstrip('/')}/token"
-    headers = {
-        "x-api-key": api_key,
-        "Accept": "application/json"
-    }
-    
-    response = requests.post(token_url, headers=headers)
-    if response.status_code == 200:
-        res_data = response.json()
-        return res_data.get("token") or res_data.get("api_token")
-    else:
-        raise Exception(f"토큰 발급 실패 (Status: {response.status_code}) - {response.text}")
-
-# 2단계: 발급받은 Bearer Token을 사용해 Helix 메시지 발송하기 (+ Event_ID 추가)
-def send_helix_message(base_url, token, cam_id, dev_id, msg_type, event_id):
-    helix_url = f"{base_url.rstrip('/')}/v1/helix/notification" 
+def send_video_tagging_event(api_key, org_id, cam_id, event_uid, dev_id, msg_type):
+    # 요청하신 URL 양식에 맞춰 구성
+    url = f"https://api.verkada.com/cameras/v1/video_tagging/event?org_id={org_id}"
     
     headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
+        "content-type": "application/json",
+        "x-verkada-auth": api_key
     }
     
-    # Event_ID가 추가된 4가지 핵심 파라미터 구조
+    # 버튼 클릭 시점의 현재 시간을 밀리초(Epoch ms)로 자동 계산
+    current_time_ms = int(time.time() * 1000)
+    
+    # 제공해주신 json 데이터 구조와 정확히 일치하게 매핑
     payload = {
-        "Camera_ID": cam_id,
-        "Device_ID": dev_id,
-        "Message_Type": str(msg_type),
-        "Event_ID": event_id  # 매번 새로 생성된 고유 ID 전달
+        "attributes": {
+            "Camera_ID": cam_id,
+            "Device_ID": dev_id,
+            "Message_Type": str(msg_type) # 1, 2, 3, 4 형태로 변환
+        },
+        "event_type_uid": event_uid,
+        "camera_id": cam_id,
+        "time_ms": current_time_ms
     }
     
-    response = requests.post(helix_url, json=payload, headers=headers)
-    return response
+    response = requests.post(url, json=payload, headers=headers)
+    return response, payload
 
 # --------------------------------------------------------
 # 4. 메인 화면: 동적 제어 버튼 생성 및 이벤트 바인딩
 # --------------------------------------------------------
 st.subheader("🚀 Horn 제어 패널")
-st.info("버튼을 누르면 고유한 Event_ID를 실시간 생성하여 Verkada Command로 Helix 메시지를 보냅니다.")
+st.info("버튼을 누르면 설정된 웹 옵션값과 현재 시간(time_ms)을 계산하여 Verkada API로 이벤트를 쏩니다.")
 
 for i in range(num_horns):
     current_horn_id = horn_ids[i]
@@ -115,34 +116,32 @@ for i in range(num_horns):
             btn_label = f"Msg {message_id}"
             
             if st.button(btn_label, key=f"btn_{i}_{message_id}", use_container_width=True):
-                if not top_level_api_key:
-                    st.warning("⚠️ 사이드바에 Top-level API Key를 먼저 입력해주세요.")
+                if not api_key:
+                    st.warning("⚠️ 사이드바에 API Key(x-verkada-auth)를 먼저 입력해주세요.")
+                elif not camera_id or camera_id == "유효한_카메라_ID_입력":
+                    st.warning("⚠️ 유효한 Camera ID를 입력해주세요.")
                 else:
-                    with st.spinner("Verkada 인증 및 메시지 전송 중..."):
+                    with st.spinner("Verkada API 전송 중..."):
                         try:
-                            # 버튼 클릭 시점에 고유한 Event_ID 생성 (예: 'c9a646d3-9c61-4cd9-bc11...')
-                            generated_event_id = str(uuid.uuid4())
-                            
-                            # 1단계 인증 진행
-                            api_token = get_short_lived_token(api_base_url, top_level_api_key)
-                            
-                            # 2단계 메시지 전송 진행
-                            response = send_helix_message(
-                                base_url=api_base_url,
-                                token=api_token,
+                            response, sent_payload = send_video_tagging_event(
+                                api_key=api_key,
+                                org_id=org_id,
                                 cam_id=camera_id,
+                                event_uid=event_type_uid,
                                 dev_id=current_horn_id,
-                                msg_type=message_id,
-                                event_id=generated_event_id
+                                msg_type=message_id
                             )
                             
                             if response.status_code in [200, 201]:
-                                st.success(f"✅ [성공] {current_horn_id} -> Message ID: {message_id} 발송 완료!")
-                                st.caption(f"🔗 **발송된 Event ID:** `{generated_event_id}`")
+                                st.success(f"✅ [성공] Horn {i+1} -> Message ID: {message_id} 전송 완료!")
+                                # 디버깅용으로 실제 날아간 Payload 데이터를 화면에 투명하게 보여줍니다.
+                                with st.expander("실제 전송된 데이터(Payload) 확인"):
+                                    st.json(sent_payload)
                             else:
-                                st.error(f"❌ [API 오류] 상태 코드: {response.status_code} | {response.text}")
+                                st.error(f"❌ [API 오류] 상태 코드: {response.status_code}")
+                                st.text(response.text)
                                 
                         except Exception as e:
-                            st.error(f"💥 [실패] {e}")
+                            st.error(f"💥 [시스템 오류] {e}")
                             
     st.markdown("---")
