@@ -1,25 +1,24 @@
 import streamlit as st
 import requests
+import uuid  # 고유한 Event_ID 생성을 위해 추가
 
 # 페이지 설정
 st.set_page_config(page_title="Verkada Horn Helix Controller", layout="wide")
 
 st.title("📯 Verkada Horn Helix Controller")
-st.caption("Verkada API v2 보안 규격(단기 토큰 발급 후 Bearer 인증)을 준수하는 Horn 우회 제어 도구입니다.")
+st.caption("Verkada API v2 보안 규격 및 Event_ID 필수 옵션이 반영된 Horn 우회 제어 도구입니다.")
 
 # --------------------------------------------------------
 # 1. 사이드바 설정 (API 및 카메라 정보 입력)
 # --------------------------------------------------------
 st.sidebar.header("⚙️ 기본 설정 (Configuration)")
 
-# Verkada API 기본 Base URL (ภูมิ역에 따라 다를 수 있으므로 입력 가능하게 설정)
 api_base_url = st.sidebar.text_input(
     "Verkada API Base URL", 
     value="https://api.verkada.com",
-    help="Verkada API의 기본 주소입니다. 일반적으로 https://api.verkada.com 입니다."
+    help="Verkada API의 기본 주소입니다."
 )
 
-# 콘솔에서 발급받은 Top-level API Key
 top_level_api_key = st.sidebar.text_input(
     "Top-level API Key", 
     type="password", 
@@ -74,14 +73,12 @@ def get_short_lived_token(base_url, api_key):
     response = requests.post(token_url, headers=headers)
     if response.status_code == 200:
         res_data = response.json()
-        # 문서 구조에 따라 'token' 또는 'api_token' 키값을 추출합니다.
         return res_data.get("token") or res_data.get("api_token")
     else:
         raise Exception(f"토큰 발급 실패 (Status: {response.status_code}) - {response.text}")
 
-# 2단계: 발급받은 Bearer Token을 사용해 Helix 메시지 발송하기
-def send_helix_message(base_url, token, cam_id, dev_id, msg_type):
-    # Helix 알림 엔드포인트 설정 (일반적인 웹훅/알림 경로 기준)
+# 2단계: 발급받은 Bearer Token을 사용해 Helix 메시지 발송하기 (+ Event_ID 추가)
+def send_helix_message(base_url, token, cam_id, dev_id, msg_type, event_id):
     helix_url = f"{base_url.rstrip('/')}/v1/helix/notification" 
     
     headers = {
@@ -89,10 +86,12 @@ def send_helix_message(base_url, token, cam_id, dev_id, msg_type):
         "Content-Type": "application/json"
     }
     
+    # Event_ID가 추가된 4가지 핵심 파라미터 구조
     payload = {
         "Camera_ID": cam_id,
         "Device_ID": dev_id,
-        "Message_Type": str(msg_type) # 요청하신 1, 2, 3, 4 형태
+        "Message_Type": str(msg_type),
+        "Event_ID": event_id  # 매번 새로 생성된 고유 ID 전달
     }
     
     response = requests.post(helix_url, json=payload, headers=headers)
@@ -102,7 +101,7 @@ def send_helix_message(base_url, token, cam_id, dev_id, msg_type):
 # 4. 메인 화면: 동적 제어 버튼 생성 및 이벤트 바인딩
 # --------------------------------------------------------
 st.subheader("🚀 Horn 제어 패널")
-st.info("버튼을 누르면 실시간으로 API Token을 갱신/인증한 뒤 Verkada Command로 Helix 메시지를 보냅니다.")
+st.info("버튼을 누르면 고유한 Event_ID를 실시간 생성하여 Verkada Command로 Helix 메시지를 보냅니다.")
 
 for i in range(num_horns):
     current_horn_id = horn_ids[i]
@@ -121,6 +120,9 @@ for i in range(num_horns):
                 else:
                     with st.spinner("Verkada 인증 및 메시지 전송 중..."):
                         try:
+                            # 버튼 클릭 시점에 고유한 Event_ID 생성 (예: 'c9a646d3-9c61-4cd9-bc11...')
+                            generated_event_id = str(uuid.uuid4())
+                            
                             # 1단계 인증 진행
                             api_token = get_short_lived_token(api_base_url, top_level_api_key)
                             
@@ -130,11 +132,13 @@ for i in range(num_horns):
                                 token=api_token,
                                 cam_id=camera_id,
                                 dev_id=current_horn_id,
-                                msg_type=message_id
+                                msg_type=message_id,
+                                event_id=generated_event_id
                             )
                             
                             if response.status_code in [200, 201]:
-                                st.success(f"✅ [성공] {current_horn_id} -> Message ID: {msg_type} 발송 완료!")
+                                st.success(f"✅ [성공] {current_horn_id} -> Message ID: {message_id} 발송 완료!")
+                                st.caption(f"🔗 **발송된 Event ID:** `{generated_event_id}`")
                             else:
                                 st.error(f"❌ [API 오류] 상태 코드: {response.status_code} | {response.text}")
                                 
