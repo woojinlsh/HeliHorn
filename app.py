@@ -14,17 +14,17 @@ T = {
         "caption": "A control tool designed for bypassing direct control limitations of Horns via Verkada Video Tagging API.",
         "sidebar_header": "⚙️ Configuration",
         "lang_label": "🌐 Language Selection",
-        "api_key": "API Key",
-        "api_key_help": "Enter the API Key generated from Verkada Command > Settings > API Keys.",
-        "org_id": "Organization ID (org_id)",
+        "api_key": "API Key *",
+        "api_key_help": "Enter the API Key generated from Verkada Command > Settings > API Keys. (Required)",
+        "org_id": "Organization ID (org_id) *",
         "org_id_placeholder": "Enter Organization ID (UUID)",
-        "org_id_help": "Organization ID used in the URL query string (?org_id=...).",
-        "camera_id": "Camera ID",
-        "camera_id_placeholder": "Enter Camera ID (UUID)",
-        "camera_id_help": "The Camera ID linked with the Helix/Tagging event.",
-        "event_type_uid": "Event Type UID (event_type_uid)",
+        "org_id_help": "Organization ID used in the URL query string (?org_id=...). (Required)",
+        "camera_id": "Camera ID (Optional)",
+        "camera_id_placeholder": "Optional - Leave blank if not needed",
+        "camera_id_help": "The Camera ID linked with the event. Will be sent as an empty string if left blank.",
+        "event_type_uid": "Event Type UID (event_type_uid) *",
         "event_type_uid_placeholder": "Enter Event Type UID (UUID)",
-        "event_type_uid_help": "The event_type_uid defined in your Verkada Command console.",
+        "event_type_uid_help": "The event_type_uid defined in your Verkada Command console. (Required)",
         "num_horns": "Number of Horns (Individual Devices)",
         "num_buttons": "Number of Message Buttons per Horn",
         "horn_setup_header": "🆔 Horn별 Device Name 설정 / Horn Device Name Setup",
@@ -35,7 +35,6 @@ T = {
         "horn_title": "### 📢 Horn {} (Name: `{}`)",
         "warn_api_key": "⚠️ Please enter the API Key in the sidebar first.",
         "warn_org_id": "⚠️ Please enter the Organization ID in the sidebar.",
-        "warn_camera_id": "⚠️ Please enter the Camera ID in the sidebar.",
         "warn_event_uid": "⚠️ Please enter the Event Type UID in the sidebar.",
         "spinner": "Verkada authentication and event transmission in progress...",
         "success": "✅ [Success] Horn {} -> Message ID: {} Transmission Complete!",
@@ -48,17 +47,17 @@ T = {
         "caption": "Verkada Video Tagging API를 통해 호른의 직접 제어 한계를 우회하도록 설계된 제어 도구입니다.",
         "sidebar_header": "⚙️ 기본 설정 (Configuration)",
         "lang_label": "🌐 언어 선택 (Language)",
-        "api_key": "API Key",
-        "api_key_help": "Verkada Command > Settings > API Keys 에서 생성한 API Key를 입력하세요.",
-        "org_id": "Organization ID (org_id)",
+        "api_key": "API Key *",
+        "api_key_help": "Verkada Command > Settings > API Keys 에서 생성한 API Key를 입력하세요. (필수)",
+        "org_id": "Organization ID (org_id) *",
         "org_id_placeholder": "조직 ID(UUID)를 입력하세요",
-        "org_id_help": "URL 쿼리 스트링(?org_id=...)에 들어갈 조직 ID입니다.",
-        "camera_id": "Camera ID",
-        "camera_id_placeholder": "카메라 ID(UUID)를 입력하세요",
-        "camera_id_help": "Helix 메시지와 연동할 Camera ID를 입력하세요.",
-        "event_type_uid": "Event Type UID (event_type_uid)",
+        "org_id_help": "URL 쿼리 스트링(?org_id=...)에 들어갈 조직 ID입니다. (필수)",
+        "camera_id": "Camera ID (선택 사항)",
+        "camera_id_placeholder": "선택 사항 - 필요 없으면 비워두세요",
+        "camera_id_help": "이벤트와 연동할 Camera ID입니다. 비워두면 빈 값으로 전송됩니다.",
+        "event_type_uid": "Event Type UID *",
         "event_type_uid_placeholder": "이벤트 타입 UID(UUID)를 입력하세요",
-        "event_type_uid_help": "웹 화면에서 정의한 event_type_uid 정보입니다.",
+        "event_type_uid_help": "웹 화면에서 정의한 event_type_uid 정보입니다. (필수)",
         "num_horns": "Horn 개수 (개별 Device)",
         "num_buttons": "Horn당 메시지 버튼 개수",
         "horn_setup_header": "🆔 Horn별 Device Name 설정 / Horn Device Name Setup",
@@ -69,7 +68,6 @@ T = {
         "horn_title": "### 📢 Horn {} (Name: `{}`)",
         "warn_api_key": "⚠️ 사이드바에 API Key를 먼저 입력해주세요.",
         "warn_org_id": "⚠️ 사이드바에 Organization ID를 입력해주세요.",
-        "warn_camera_id": "⚠️ 사이드바에 Camera ID를 입력해주세요.",
         "warn_event_uid": "⚠️ 사이드바에 Event Type UID를 입력해주세요.",
         "spinner": "Verkada 보안 인증 및 이벤트 전송 중...",
         "success": "✅ [성공] Horn {} -> Message ID: {} 전송 완료!",
@@ -84,15 +82,13 @@ T = {
 # --------------------------------------------------------
 if "lang" not in st.session_state:
     try:
-        # 사용자의 브라우저 Accept-Language 헤더 추출
         accept_lang = st.context.headers.get("Accept-Language", "")
-        # 한국어('ko')가 포함되어 있으면 ko, 그 외 모든 언어는 en으로 기본 설정
         if "ko" in accept_lang.lower():
             st.session_state.lang = "ko"
         else:
             st.session_state.lang = "en"
     except:
-        st.session_state.lang = "en"  # 예외 상황 발생 시 영어 기본 세팅
+        st.session_state.lang = "en"
 
 # --------------------------------------------------------
 # 📱 아이패드 터치 조작을 위한 초대형 버튼 CSS 스타일
@@ -123,7 +119,6 @@ st.markdown("""
 # --------------------------------------------------------
 st.sidebar.header("⚙️ Settings")
 
-# 수동으로 언어를 변경할 수 있는 셀렉트박스 메뉴 배치
 lang_options = {"en": "English", "ko": "한국어"}
 current_idx = list(lang_options.keys()).index(st.session_state.lang)
 
@@ -132,13 +127,10 @@ selected_lang_name = st.sidebar.selectbox(
     options=list(lang_options.values()),
     index=current_idx
 )
-# 선택한 값에 따라 세션 언어 상태 업데이트
 st.session_state.lang = [k for k, v in lang_options.items() if v == selected_lang_name][0]
 
-# 현재 언어 번역 팩 지정
 text = T[st.session_state.lang]
 
-# 메인 타이틀 출력
 st.title(text["title"])
 st.caption(text["caption"])
 
@@ -154,15 +146,16 @@ org_id = st.sidebar.text_input(
     help=text["org_id_help"]
 )
 
+# [수정] Camera ID를 필수 필드가 아닌 선택 필드로 명시
 camera_id = st.sidebar.text_input(
-    "Camera ID", 
+    text["camera_id"], 
     value="", 
     placeholder=text["camera_id_placeholder"],
     help=text["camera_id_help"]
 )
 
 event_type_uid = st.sidebar.text_input(
-    "Event Type UID",
+    text["event_type_uid"],
     value="",
     placeholder=text["event_type_uid_placeholder"],
     help=text["event_type_uid_help"]
@@ -223,6 +216,7 @@ def send_video_tagging_event(token, org_id, cam_id, event_uid, dev_name, msg_typ
     
     current_time_ms = int(time.time() * 1000)
     
+    # [참고] cam_id가 비어있어도 필드는 계속 유지되어 전송됩니다.
     payload = {
         "attributes": {
             "Camera_ID": cam_id,
@@ -255,12 +249,11 @@ for i in range(num_horns):
             btn_label = f"Msg {message_id}"
             
             if st.button(btn_label, key=f"btn_{i}_{message_id}", use_container_width=True):
+                # [수정] camera_id 누락 검사를 제외한 나머지 필수 값들만 유효성 검증
                 if not api_key:
                     st.warning(text["warn_api_key"])
                 elif not org_id:
                     st.warning(text["warn_org_id"])
-                elif not camera_id:
-                    st.warning(text["warn_camera_id"])
                 elif not event_type_uid:
                     st.warning(text["warn_event_uid"])
                 else:
@@ -271,7 +264,7 @@ for i in range(num_horns):
                             response, sent_payload = send_video_tagging_event(
                                 token=short_token,
                                 org_id=org_id,
-                                cam_id=camera_id,
+                                cam_id=camera_id, # 입력받은 빈 스트링값("")이 그대로 전송됨
                                 event_uid=event_type_uid,
                                 dev_name=current_horn_name,
                                 msg_type=message_id
